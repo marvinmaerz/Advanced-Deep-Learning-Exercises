@@ -13,9 +13,9 @@ python = "3.9"
 installer = "uv"
 skip-install = true
 dependencies = [
-    "torch==2.0.0",
-    "torchvision==0.15.1",
-    "torchaudio==2.0.1",
+    "torch==2.0.0+cu118",
+    "torchvision==0.15.1+cu118",
+    "torchaudio==2.0.1+cu118",
     "triton==2.0.0; platform_system == 'Linux'",
     "lightning==2.0.3",
     "pytorch-lightning==2.0.3",
@@ -46,3 +46,9 @@ dependencies = [
     "psutil==5.9.1",
     "requests==2.29.0",
 ]
+
+[tool.hatch.envs.default.env-vars]
+# PyTorch's CUDA builds are not on PyPI. "unsafe-best-match" lets uv pick each
+# package from whichever index has the pinned version (PyPI or the PyTorch index).
+UV_EXTRA_INDEX_URL = "https://download.pytorch.org/whl/cu118"
+UV_INDEX_STRATEGY = "unsafe-best-match"
