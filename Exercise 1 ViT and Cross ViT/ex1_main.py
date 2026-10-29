@@ -64,15 +64,13 @@ def run(args):
 									transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225) ) 
                                     ])
 
-    # TODO: adjust folder
-    dataset = datasets.CIFAR10('/adjust/your/cifar10/folder', download=True, train=True, transform=transform)
+    dataset = datasets.CIFAR10('C:/dev/adl/ds-cifar10', download=True, train=True, transform=transform)  # (Windows also accepts forward slash as path)
     trainset, valset = torch.utils.data.random_split(dataset, [int(len(dataset)*0.9), len(dataset)-int(len(dataset)*0.9)])
     trainloader = DataLoader(trainset, batch_size=64, shuffle=True)
     valloader = DataLoader(valset, batch_size=64, shuffle=False)
 
     # Download and load the test data
-    # TODO: adjust folder
-    testset = datasets.CIFAR10('/adjust/your/cifar10/folder/', download=True, train=False, transform=transform)
+    testset = datasets.CIFAR10('C:/dev/adl/ds-cifar10', download=True, train=False, transform=transform)
     testloader = DataLoader(testset, batch_size=64, shuffle=True)
 
     # Build a feed-forward network
@@ -100,6 +98,7 @@ def run(args):
         device = torch.device("cuda")
     else:
         device = torch.device("cpu")
+    print(f"Cuda available? {torch.cuda.is_available()}")
     model.to(device)
     optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
 
