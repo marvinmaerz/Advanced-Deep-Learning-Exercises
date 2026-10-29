@@ -58,6 +58,14 @@ def test(model, device, test_loader, criterion, set="Test"):
 
 
 def run(args):
+    # add augmentation to training set
+    train_transforms = transforms.Compose([
+        transforms.RandomCrop(32, padding=4),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
+    ])
+
     # Download and load the training data
     transform = transforms.Compose([transforms.ToTensor(),
                                     # ImageNet mean/std values should also fit okayish for CIFAR
@@ -65,14 +73,14 @@ def run(args):
                                     ])
 
     # TODO: adjust folder
-    dataset = datasets.CIFAR10('/adjust/your/cifar10/folder', download=True, train=True, transform=transform)
+    dataset = datasets.CIFAR10('./cifar-10-python', download=True, train=True, transform=train_transforms)        # add new augmentation
     trainset, valset = torch.utils.data.random_split(dataset, [int(len(dataset)*0.9), len(dataset)-int(len(dataset)*0.9)])
     trainloader = DataLoader(trainset, batch_size=64, shuffle=True)
     valloader = DataLoader(valset, batch_size=64, shuffle=False)
 
     # Download and load the test data
     # TODO: adjust folder
-    testset = datasets.CIFAR10('/adjust/your/cifar10/folder/', download=True, train=False, transform=transform)
+    testset = datasets.CIFAR10('./cifar-10-python', download=True, train=False, transform=transform)
     testloader = DataLoader(testset, batch_size=64, shuffle=True)
 
     # Build a feed-forward network
