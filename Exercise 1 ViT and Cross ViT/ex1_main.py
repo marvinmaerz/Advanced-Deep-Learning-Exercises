@@ -5,7 +5,7 @@ from torchvision import datasets, transforms, models
 from torch.utils.data import DataLoader
 from torch import optim
 
-from my_models import ViT, CrossViT   # rename the skeleton file for your implementation / comment before testing for ResNet
+# from my_models import ViT, CrossViT   # rename the skeleton file for your implementation / comment before testing for ResNet
 
 
 def parse_args():
@@ -73,20 +73,21 @@ def run(args):
                                     ])
 
     # TODO: adjust folder
-    dataset = datasets.CIFAR10('./cifar-10-python', download=True, train=True, transform=train_transforms)        # add new augmentation
+    dataset = datasets.CIFAR10('./cifar10', download=True, train=True, transform=train_transforms)        # add new augmentation
     trainset, valset = torch.utils.data.random_split(dataset, [int(len(dataset)*0.9), len(dataset)-int(len(dataset)*0.9)])
     trainloader = DataLoader(trainset, batch_size=64, shuffle=True)
     valloader = DataLoader(valset, batch_size=64, shuffle=False)
 
     # Download and load the test data
     # TODO: adjust folder
-    testset = datasets.CIFAR10('./cifar-10-python', download=True, train=False, transform=transform)
+    testset = datasets.CIFAR10('./cifar10', download=True, train=False, transform=transform)
     testloader = DataLoader(testset, batch_size=64, shuffle=True)
 
     # Build a feed-forward network
     print(f"Using {args.model}")
     if args.model == "r18":
         model = models.resnet18(pretrained=False)
+        model.fc = nn.Linear(model.fc.in_features, 10)  # final layer for CIFAR-10
     elif args.model == "vit":
         model = ViT(image_size = 32, patch_size = 8, num_classes = 10, dim = 64,
                     depth = 2, heads = 8, mlp_dim = 128, dropout = 0.1,
