@@ -4,8 +4,9 @@ from torch import nn
 from torchvision import datasets, transforms, models
 from torch.utils.data import DataLoader
 from torch import optim
+import os
 
-# from my_models import ViT, CrossViT   # rename the skeleton file for your implementation / comment before testing for ResNet
+from my_models_skeleton import ViT # CrossViT   # rename the skeleton file for your implementation / comment before testing for ResNet
 
 
 def parse_args():
@@ -72,14 +73,12 @@ def run(args):
 									transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225) ) 
                                     ])
 
-    # TODO: adjust folder
     dataset = datasets.CIFAR10('./cifar10', download=True, train=True, transform=train_transforms)        # add new augmentation
     trainset, valset = torch.utils.data.random_split(dataset, [int(len(dataset)*0.9), len(dataset)-int(len(dataset)*0.9)])
     trainloader = DataLoader(trainset, batch_size=64, shuffle=True)
     valloader = DataLoader(valset, batch_size=64, shuffle=False)
 
     # Download and load the test data
-    # TODO: adjust folder
     testset = datasets.CIFAR10('./cifar10', download=True, train=False, transform=transform)
     testloader = DataLoader(testset, batch_size=64, shuffle=True)
 
@@ -91,7 +90,8 @@ def run(args):
     elif args.model == "vit":
         model = ViT(image_size = 32, patch_size = 8, num_classes = 10, dim = 64,
                     depth = 2, heads = 8, mlp_dim = 128, dropout = 0.1,
-                    emb_dropout = 0.1) 
+                    emb_dropout = 0.1)
+    '''
     elif args.model == "cvit":
         model = CrossViT(image_size = 32, num_classes = 10, sm_dim = 64, 
                          lg_dim = 128, sm_patch_size = 8, sm_enc_depth = 2,
@@ -101,7 +101,7 @@ def run(args):
                          lg_enc_mlp_dim = 128, lg_enc_dim_head = 64,
                          cross_attn_depth = 2, cross_attn_heads = 8,
                          cross_attn_dim_head = 64, depth = 3, dropout = 0.1,
-                         emb_dropout = 0.1)
+                         emb_dropout = 0.1)'''
 
     # Define the loss
     criterion = nn.CrossEntropyLoss(reduction="sum")
@@ -117,6 +117,13 @@ def run(args):
         test(model, device, valloader, criterion, set="Validation")
 
     test(model, device, testloader, criterion)
+
+    # save the model
+    if args.save_model:
+        os.makedirs("models", exist_ok=True)
+        model_path = os.path.join("models", f"{args.model}_cifar10.pt")
+        torch.save(model.state_dict(), model_path)
+        print(f"Model saved to {model_path}")
 
 if __name__ == '__main__':
     args = parse_args()

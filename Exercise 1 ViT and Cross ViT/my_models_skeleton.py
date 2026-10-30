@@ -39,19 +39,36 @@ class FeedForward(nn.Module):
 # ViT & CrossViT
 # Attention class for multi-head self-attention mechanism with softmax and dropout
 class Attention(nn.Module):
-    def __init__(self, dim, heads = 8, dim_head = 64, dropout = 0.):
+    def __init__(self, dim, heads = 8, dim_head = 64, dropout = 0.0):
         super().__init__()
         # set heads and scale (=sqrt(dim_head))
-        # TODO
+        inner_dim = dim_head * heads                            # calculate inner dimensions for dimension of position wise FFN (we want one big layer for all heads!)
+
+        if heads == 1 and dim_head == dim:                      # check if projection is linear
+            project_out = False
+        else:
+            project_out = True
+
+        self.heads = heads                                      # define heads
+        self.scale = dim_head ** -0.5                           # scale factor (1 / sqrt(dim_head)) (see Lecture slides, softmax(.../ sqrt(d_k)))
+
+
         # we need softmax layer and dropout
-        # TODO
+        self.attend = nn.Softmax(dim = -1)                      # normalize attention weights along key dimension (lecture atention formula)
+        self.dropout = nn.Dropout(dropout)                      # dropout for attention probabilities
+
         # as well as the q linear layer
-        # TODO
+        self.to_q = nn.Linear(dim, inner_dim, bias = False)     # lin layer to project input tokens into Query vectors without bias
+
         # and the k/v linear layer (can be realized as one single linear layer
         # or as two individual ones)
-        # TODO
+        self.to_kv = nn.Linear(dim, inner_dim * 2, bias = False) # combined key and value linear layer (better parallelization, reduce number of separate matrx. multpl.)
+
         # and the output linear layer followed by dropout
-        # TODO
+        self.to_out = nn.Sequential(
+            nn.Linear(inner_dim, dim),
+            nn.Dropout(dropout)
+        ) if project_out else nn.Identity()                       # if just one head output the identity
 
     def forward(self, x, context = None, kv_include_self = False):
         # now compute the attention/cross-attention
@@ -59,17 +76,41 @@ class Attention(nn.Module):
         # don't forget the dropout after the attention 
         # and before the multiplication w. 'v'
         # the output should be in the shape 'b n (h d)'
-        b, n, _, h = *x.shape, self.heads
+
+        # unpack batch size b, sequence length n, feature dimension, and number of heads h
+        b, n, _, h = *x.shape, self.heads                                               # x = [batch_size, sequence_length, feature_dim]
         if context is None:
-            context = x
+            context = x                                                                 # default context to input x if not provided
 
         if kv_include_self:
             # cross attention requires CLS token includes itself as key / value
-            context = torch.cat((x, context), dim = 1) 
-        
-        # TODO: attention 
+            context = torch.cat((x, context), dim = 1)
 
-        return out 
+        # project input to queries and context to keys & values, then split K and V along the last dimension
+        qkv = (self.to_q(x), *self.to_kv(context).chunk(2, dim = -1))                   # remember kv split in middle gives k and v
+
+        # reshape Q, K, V tensors from [batch, seq_len, inner_dim] to multi-head shape [batch, heads, seq_len, dim_head]
+        q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> b h n d', h=h), qkv)  # (h d) combined inner dim
+
+        # compute scaled dot-product attention scores between queries and keys across all heads (Attention formula without softmasx)
+        dots = einsum('b h i d, b h j d -> b h i j', q, k) * self.scale  # q shape:(Batch, Heads, Query tokens i, Feature dimension d), k shape:(Batch, Heads, Key tokens j, Feature dimension d)
+
+        # apply softmax to obtain normalized attention probability distribution
+        attn = self.attend(dots)
+
+        # apply dropout to the attention probabilities
+        attn = self.dropout(attn)
+
+        # multiply attention weights with values V to get attended feature representations
+        # attn:(BatchSize, heads, query tokens, key/value tokens)
+        # value vector (batchsize, heads, value tokens (matching keys), head dimension)
+        out = einsum('b h i j, b h j d -> b h i d', attn, v)  # calc (batch, heads, query tokens, head dimension)
+
+        # reshape and merge multi-head dimensions back to [batch, seq_len, inner_dim]
+        out = rearrange(out, 'b h n d -> b n (h d)')        # output of Encoder matches input size
+
+        # pass through the final output linear projection layer and dropout
+        return self.to_out(out)
 
 
 # ViT & CrossViT

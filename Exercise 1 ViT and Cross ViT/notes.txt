@@ -1,0 +1,5 @@
+ResNet18 <-> ViT:
+    - ViT has no assumption about spatial structure locally, just sees the patches as tokens (ResNet local pattern kernels)
+    - Lecture told that Transformers need more data and longer training if model not pretrained to converge
+    - maybe 16x16 patches -> need more?
+    - SGD with Momentum not the best choice, where AdamW might be better
