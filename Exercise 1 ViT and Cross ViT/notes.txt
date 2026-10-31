@@ -3,3 +3,48 @@ ResNet18 <-> ViT:
     - Lecture told that Transformers need more data and longer training if model not pretrained to converge
     - maybe 16x16 patches -> need more?
     - SGD with Momentum not the best choice, where AdamW might be better
+
+ViT:
+    - Split image into non-overlapping patches and flatten them into 1D sequence of tokens via linear projection.
+    - Add a learnable Class Token (CLS) to the sequence and inject 1D positional embeddings to encode spatial location.
+    - Process entire sequence through stacked standard Transformer Encoders using Multi-Head Self-Attention (MSA) and Feed-Forward Networks (FFN).
+    - Extract final output representation and pass it through an MLP head for classification.
+
+    --> it must learn spatial relationships entirely from data
+    --> Self-attention scales quadratically with respect to token sequence length: O(N^2).
+
+
+    Pipeline Dimensions:
+        - Raw Image: [B, C, H, W] (Batch size, Channels, Height, Width)
+        - Flattened Patch Embeddings: [B, N, dim] (where N = (H/patch_h) * (W/patch_w) total patches, dim is model hidden dimension)
+        - Class Token: [1, 1, dim] (prepended to the front of patch tokens, expanded to [B, 1, dim])
+        - Positional Embedding: [1, N + 1, dim] (added element-wise to patch tokens + CLS token)
+        - Transformer Sequence Input: [B, N + 1, dim]
+        - Self-Attention Tensors (inside Transformer Encoders):
+            - Query Q: [B, h, N + 1, d] (where h is heads, d is dim_head)
+            - Key K:   [B, h, N + 1, d]
+            - Value V: [B, h, N + 1, d]
+            - Attention Scores (Q @ K^T): [B, h, N + 1, N + 1]
+        - Pooled Vector for Head: [B, dim] (extracted CLS token at index 0 or spatial mean over dim=1)
+        - Classification Output: [B, num_classes] (after MLP head processing)
+
+
+CrossViT:
+    - Images split into small and large patches processed in parallel using standard self attention (N and M encoders)
+    - Class token of one branch acts as the Query, while the patch tokens of the opposite branch act as Keys and Values.
+        -> drop from O((N+M)**2) to O(N)
+    - final class tokens from both branches are processed through separate MLP headers,
+      and outputs are combined for the final prediction. (sum and highest probability)
+
+    --> paper key takeaway Key Takeaway: Ablation study: large branch dominates overall accuracy, while small branch provides essential local details.
+
+
+    Pipeline Dimensions:
+    - Raw Image: [B, C, H, W] (Batch size, Channels, Height, Width)
+    - Patch Tokens (after Rearrange & Linear Projection): [B, N, dim] (where N total patches, dim is hidden width like sm_dim or lg_dim)
+    - Class Token: [1, 1, dim] (added to the front of the patch tokens)
+    - Transformer Sequence Input (Patches + Class Token): [B, N + 1, dim]
+    - Cross-Attention Tensors (at the fusion bridge):
+        - Query Q: [B, 1, dim] (from the opposite branch's class token
+        - Key K: [B, N, dim] (from the opposite branch's patch tokens)
+    - Classification: [B, num_classes] (after MLP head processing the class token)

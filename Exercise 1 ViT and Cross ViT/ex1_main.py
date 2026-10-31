@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 from torch import optim
 import os
 
-from my_models_skeleton import ViT # CrossViT   # rename the skeleton file for your implementation / comment before testing for ResNet
+from my_models_skeleton import ViT, CrossViT
 
 
 def parse_args():
@@ -91,7 +91,6 @@ def run(args):
         model = ViT(image_size = 32, patch_size = 8, num_classes = 10, dim = 64,
                     depth = 2, heads = 8, mlp_dim = 128, dropout = 0.1,
                     emb_dropout = 0.1)
-    '''
     elif args.model == "cvit":
         model = CrossViT(image_size = 32, num_classes = 10, sm_dim = 64, 
                          lg_dim = 128, sm_patch_size = 8, sm_enc_depth = 2,
@@ -101,7 +100,7 @@ def run(args):
                          lg_enc_mlp_dim = 128, lg_enc_dim_head = 64,
                          cross_attn_depth = 2, cross_attn_heads = 8,
                          cross_attn_dim_head = 64, depth = 3, dropout = 0.1,
-                         emb_dropout = 0.1)'''
+                         emb_dropout = 0.1)
 
     # Define the loss
     criterion = nn.CrossEntropyLoss(reduction="sum")
