@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 from torch import optim
 
 from my_models import ViT, CrossViT   # rename the skeleton file for your implementation / comment before testing for ResNet
-
+from model_utils import save_model_ckpt
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train a neural network to classify CIFAR10')
@@ -51,18 +51,24 @@ def test(model, device, test_loader, criterion, set="Test"):
             correct += pred.eq(target.view_as(pred)).sum().item()
 
     test_loss /= len(test_loader.dataset)
+    accuracy = correct / len(test_loader.dataset)
 
     print('\n{} set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
         set, test_loss, correct, len(test_loader.dataset),
-        100. * correct / len(test_loader.dataset)))
+        accuracy * 100.))
+
+    return accuracy
 
 
 def run(args):
     # Download and load the training data
-    transform = transforms.Compose([transforms.ToTensor(),
-                                    # ImageNet mean/std values should also fit okayish for CIFAR
-									transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225) ) 
-                                    ])
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        # ImageNet mean/std values should also fit okayish for CIFAR
+        transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+        transforms.RandomCrop(size=28),
+        transforms.RandomHorizontalFlip(p=0.5),
+    ])
 
     dataset = datasets.CIFAR10('C:/dev/adl/ds-cifar10', download=True, train=True, transform=transform)  # (Windows also accepts forward slash as path)
     trainset, valset = torch.utils.data.random_split(dataset, [int(len(dataset)*0.9), len(dataset)-int(len(dataset)*0.9)])
@@ -98,15 +104,30 @@ def run(args):
         device = torch.device("cuda")
     else:
         device = torch.device("cpu")
-    print(f"Cuda available? {torch.cuda.is_available()}")
+    print(f"CUDA available: {torch.cuda.is_available()}")
     model.to(device)
     optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
 
+    accuracy_max = -1.0
+    best_model_ckpt: dict = {}
+
     for epoch in range(1, args.epochs + 1):
         train(model, trainloader, optimizer, criterion, device, epoch)
-        test(model, device, valloader, criterion, set="Validation")
+        accuracy = test(model, device, valloader, criterion, set="Validation")
+        if accuracy > accuracy_max:
+            # Save whole checkpoint to possibly resume training
+            best_model_ckpt = {
+                "model": args.model,
+                "epoch": epoch,
+                "model_state_dict": model.state_dict(),
+                "optimizer_state_dict": optimizer.state_dict(),
+                "accuracy": accuracy,
+            }
 
     test(model, device, testloader, criterion)
+
+    if args.save_model:
+        save_model_ckpt(best_model_ckpt)
 
 if __name__ == '__main__':
     args = parse_args()
