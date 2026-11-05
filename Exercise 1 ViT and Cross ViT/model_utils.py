@@ -1,12 +1,15 @@
 from torch import save
-
 from pathlib import Path
 
 
 def save_model_ckpt(model_ckpt: dict):
-    out_dir = Path("checkpoints")
+    model_name = model_ckpt["model"]
+    epoch = model_ckpt["epoch"]
+    accuracy = model_ckpt["accuracy"]
+
+    out_dir = Path(f"checkpoints/{model_name}")
     out_dir.mkdir(parents=True, exist_ok=True)
-    fname = f"ckpt-{model_ckpt['model']}_CIFAR10_ep={model_ckpt['epoch']}_acc={model_ckpt['accuracy']}.pt"
+    fname = f"{model_name}_ep={epoch}_acc={accuracy:.2f}.ckpt.pt"
     save(model_ckpt, out_dir / fname)
     print(f"Saved model checkpoint to: {out_dir/fname}")
 
