@@ -1,4 +1,5 @@
 import torch
+import math
 from torch import nn, einsum
 import torch.nn.functional as F
 
@@ -10,8 +11,10 @@ def pair(t):
     return t if isinstance(t, tuple) else (t, t)
 
 # ViT & CrossViT
-# PreNorm class for layer normalization before passing the input to another function (fn)
-class PreNorm(nn.Module):    
+class PreNorm(nn.Module):
+    """
+    PreNorm class for layer normalization before passing the input to another function (fn)
+    """
     def __init__(self, dim, fn):
         super().__init__()
         self.norm = nn.LayerNorm(dim)
@@ -20,10 +23,12 @@ class PreNorm(nn.Module):
         return self.fn(self.norm(x), **kwargs)
 
 # ViT & CrossViT
-# FeedForward class for a feed forward neural network consisting of 2 linear layers, 
-# where the first has a GELU activation followed by dropout, then the next linear layer
-# followed again by dropout
 class FeedForward(nn.Module):
+    """
+    FeedForward class for a feed forward neural network consisting of 2 linear layers,
+    where the first has a GELU activation followed by dropout, then the next linear layer
+    followed again by dropout.
+    """
     def __init__(self, dim, hidden_dim, dropout = 0.):
         super().__init__()
         self.net = nn.Sequential(
@@ -37,21 +42,32 @@ class FeedForward(nn.Module):
         return self.net(x)
 
 # ViT & CrossViT
-# Attention class for multi-head self-attention mechanism with softmax and dropout
 class Attention(nn.Module):
+    """
+    Attention class for multi-head self-attention mechanism with softmax and dropout
+    """
     def __init__(self, dim, heads = 8, dim_head = 64, dropout = 0.):
         super().__init__()
         # set heads and scale (=sqrt(dim_head))
-        # TODO
+        self.heads = heads  # number of parallel attention heads
+        self.scale = math.sqrt(dim_head)
+        self.dim_head = dim_head
+        self.inner_dim = heads * dim_head  # intermediate dim: number of heads * dimension of each head
         # we need softmax layer and dropout
-        # TODO
+        self.softmax = nn.Softmax(dim=-1)
+        self.dropout = nn.Dropout(p=dropout)
         # as well as the q linear layer
-        # TODO
+        self.linear_q = nn.Linear(in_features=dim, out_features=self.inner_dim)
         # and the k/v linear layer (can be realized as one single linear layer
         # or as two individual ones)
-        # TODO
+        self.linear_k = nn.Linear(in_features=dim, out_features=self.inner_dim)
+        self.linear_v = nn.Linear(in_features=dim, out_features=self.inner_dim)
         # and the output linear layer followed by dropout
-        # TODO
+        # self.linear_out = nn.Linear(in_features=self.inner_dim, out_features=dim)
+        self.linear_out = nn.Sequential(
+            nn.Linear(in_features=self.inner_dim, out_features=dim),
+            nn.Dropout(p=dropout),
+        )
 
     def forward(self, x, context = None, kv_include_self = False):
         # now compute the attention/cross-attention
@@ -65,10 +81,26 @@ class Attention(nn.Module):
 
         if kv_include_self:
             # cross attention requires CLS token includes itself as key / value
-            context = torch.cat((x, context), dim = 1) 
-        
-        # TODO: attention 
+            context = torch.cat((x, context), dim = 1)
 
+        m = context.shape[1]  # may be different from n in cross-attention
+        
+        # attention:
+        Q = self.linear_q(x)  # shape [b, n, self.inner_dim]
+        Q = torch.reshape(Q, (b, n, h, self.dim_head)).transpose(1, 2)  # divide into h-meany attention heads: [b, h, n, self.dim_head]
+
+        K = self.linear_k(context)
+        K = torch.reshape(K, (b, m, h, self.dim_head)).transpose(1, 2)
+
+        V = self.linear_v(context)
+        V = torch.reshape(V, (b, m, h, self.dim_head)).transpose(1, 2)
+
+        scores = Q @ K.transpose(-1, -2) / self.scale
+
+        out = self.dropout(self.softmax(scores)) @ V
+        out = out.transpose(1, 2).reshape(b, n, self.inner_dim)  # "concat" heads
+
+        out = self.linear_out(out)
         return out 
 
 
@@ -343,10 +375,10 @@ class CrossViT(nn.Module):
 if __name__ == "__main__":
     x = torch.randn(16, 3, 32, 32)
     vit = ViT(image_size = 32, patch_size = 8, num_classes = 10, dim = 64, depth = 2, heads = 8, mlp_dim = 128, dropout = 0.1, emb_dropout = 0.1)
-    cvit = CrossViT(image_size = 32, num_classes = 10, sm_dim = 64, lg_dim = 128, sm_patch_size = 8,
-                    sm_enc_depth = 2, sm_enc_heads = 8, sm_enc_mlp_dim = 128, sm_enc_dim_head = 64,
-                    lg_patch_size = 16, lg_enc_depth = 2, lg_enc_heads = 8, lg_enc_mlp_dim = 128,
-                    lg_enc_dim_head = 64, cross_attn_depth = 2, cross_attn_heads = 8, cross_attn_dim_head = 64,
-                    depth = 3, dropout = 0.1, emb_dropout = 0.1)
+    # cvit = CrossViT(image_size = 32, num_classes = 10, sm_dim = 64, lg_dim = 128, sm_patch_size = 8,
+    #                 sm_enc_depth = 2, sm_enc_heads = 8, sm_enc_mlp_dim = 128, sm_enc_dim_head = 64,
+    #                 lg_patch_size = 16, lg_enc_depth = 2, lg_enc_heads = 8, lg_enc_mlp_dim = 128,
+    #                 lg_enc_dim_head = 64, cross_attn_depth = 2, cross_attn_heads = 8, cross_attn_dim_head = 64,
+    #                 depth = 3, dropout = 0.1, emb_dropout = 0.1)
     print(vit(x).shape)
-    print(cvit(x).shape)
+    # print(cvit(x).shape)

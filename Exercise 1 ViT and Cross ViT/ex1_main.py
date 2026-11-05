@@ -64,19 +64,20 @@ def run(args):
     # Download and load the training data
     transform = transforms.Compose([
         transforms.ToTensor(),
+        transforms.RandomCrop(size=28),
+        transforms.Pad(2, padding_mode="reflect"),  # needed to get back to 32x32 px for ViT and CViT
+        transforms.RandomHorizontalFlip(p=0.5),
         # ImageNet mean/std values should also fit okayish for CIFAR
         transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
-        transforms.RandomCrop(size=20),
-        transforms.RandomHorizontalFlip(p=0.5),
     ])
 
-    dataset = datasets.CIFAR10('C:/dev/adl/ds-cifar10', download=True, train=True, transform=transform)  # (Windows also accepts forward slash as path)
+    dataset = datasets.CIFAR10('/proj/aimi-adl/CIFAR10', download=True, train=True, transform=transform)  # (Windows also accepts forward slash as path)
     trainset, valset = torch.utils.data.random_split(dataset, [int(len(dataset)*0.9), len(dataset)-int(len(dataset)*0.9)])
-    trainloader = DataLoader(trainset, batch_size=64, shuffle=True)
+    trainloader = DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=4, pin_memory=True)
     valloader = DataLoader(valset, batch_size=64, shuffle=False)
 
     # Download and load the test data
-    testset = datasets.CIFAR10('C:/dev/adl/ds-cifar10', download=True, train=False, transform=transform)
+    testset = datasets.CIFAR10('/proj/aimi-adl/CIFAR10', download=True, train=False, transform=transform)
     testloader = DataLoader(testset, batch_size=64, shuffle=True)
 
     # Build a feed-forward network
