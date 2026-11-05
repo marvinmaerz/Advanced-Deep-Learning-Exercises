@@ -66,7 +66,7 @@ def run(args):
         transforms.ToTensor(),
         # ImageNet mean/std values should also fit okayish for CIFAR
         transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
-        transforms.RandomCrop(size=28),
+        transforms.RandomCrop(size=20),
         transforms.RandomHorizontalFlip(p=0.5),
     ])
 
