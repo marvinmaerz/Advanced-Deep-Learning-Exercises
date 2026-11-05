@@ -12,4 +12,7 @@ def save_model_ckpt(model_ckpt: dict):
 
 # TODO: load_model_ckpt()
 
+def load_model_ckpt(file: Path) -> dict :
+    pass
+
 # TODO: evaluation utils (inference and/or visualization)
