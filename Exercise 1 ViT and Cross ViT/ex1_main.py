@@ -115,7 +115,9 @@ def run(args):
         train(model, trainloader, optimizer, criterion, device, epoch)
         accuracy = test(model, device, valloader, criterion, set="Validation")
         if accuracy > accuracy_max:
+            accuracy_max = accuracy
             # Save whole checkpoint to possibly resume training
+            print("Caching current best model w.r.t. accuracy.\n")
             best_model_ckpt = {
                 "model": args.model,
                 "epoch": epoch,
