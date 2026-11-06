@@ -10,7 +10,7 @@ from model_utils import save_model_ckpt
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train a neural network to classify CIFAR10')
-    parser.add_argument('--model', type=str, default='r18', help='model to train (default: r18)')
+    parser.add_argument('--model', type=str, default='r18', help='model to train (default: r18; options: r18, vit, cvit)')
     parser.add_argument('--batch-size', type=int, default=64, help='input batch size for training (default: 64)')
     parser.add_argument('--epochs', type=int, default=5, help='number of epochs to train (default: 5)')
     parser.add_argument('--lr', type=float, default=0.003, help='learning rate (default: 0.003)')
@@ -71,13 +71,13 @@ def run(args):
         transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
     ])
 
-    dataset = datasets.CIFAR10('/proj/aimi-adl/CIFAR10', download=True, train=True, transform=transform)  # (Windows also accepts forward slash as path)
+    dataset = datasets.CIFAR10('C:\\dev\\adl\\ds-cifar10', download=True, train=True, transform=transform)  # (Windows also accepts forward slash as path)
     trainset, valset = torch.utils.data.random_split(dataset, [int(len(dataset)*0.9), len(dataset)-int(len(dataset)*0.9)])
     trainloader = DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=4, pin_memory=True)
     valloader = DataLoader(valset, batch_size=64, shuffle=False)
 
     # Download and load the test data
-    testset = datasets.CIFAR10('/proj/aimi-adl/CIFAR10', download=True, train=False, transform=transform)
+    testset = datasets.CIFAR10('C:\\dev\\adl\\ds-cifar10', download=True, train=False, transform=transform)
     testloader = DataLoader(testset, batch_size=64, shuffle=True)
 
     # Build a feed-forward network
