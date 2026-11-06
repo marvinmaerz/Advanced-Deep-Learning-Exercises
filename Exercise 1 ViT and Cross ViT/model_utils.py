@@ -2,7 +2,7 @@ from torch import save
 from pathlib import Path
 
 
-def save_model_ckpt(model_ckpt: dict, name_suffix: str):
+def save_model_ckpt(model_ckpt: dict, name_suffix: str = ""):
     model_name = model_ckpt["model"]
     epoch = model_ckpt["epoch"]
     accuracy = model_ckpt["accuracy"]
