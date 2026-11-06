@@ -1,8 +1,9 @@
 import argparse
 import torch
+import copy
 from torch import nn
 from torchvision import datasets, transforms, models
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 from torch import optim
 
 from my_models import ViT, CrossViT   # rename the skeleton file for your implementation / comment before testing for ResNet
@@ -19,6 +20,7 @@ def parse_args():
     parser.add_argument('--seed', type=int, default=1, help='random seed (default: 1)')
     parser.add_argument('--log-interval', type=int, default=10, help='how many batches to wait before logging training status')
     parser.add_argument('--save-model', action='store_true', default=False, help='For Saving the current Model')
+    parser.add_argument('--save-name', type=str, help="Optional name suffix for the saved checkpoint name.")
     parser.add_argument('--dry-run', action='store_true', default=False, help='quickly check a single pass')
     return parser.parse_args()
 
@@ -62,22 +64,38 @@ def test(model, device, test_loader, criterion, set="Test"):
 
 def run(args):
     # Download and load the training data
-    transform = transforms.Compose([
+    # ImageNet mean/std values should also fit okayish for CIFAR
+    normalize = transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
+    train_transform = transforms.Compose([
         transforms.ToTensor(),
-        transforms.RandomCrop(size=28),
-        transforms.Pad(2, padding_mode="reflect"),  # needed to get back to 32x32 px for ViT and CViT
+        transforms.RandomCrop(size=32, padding=4, padding_mode="reflect"),
+        # transforms.Pad(2, padding_mode="reflect"),  # needed to get back to 32x32 px for ViT and CViT
         transforms.RandomHorizontalFlip(p=0.5),
-        # ImageNet mean/std values should also fit okayish for CIFAR
-        transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+        normalize,
+    ])
+    # deterministic transforms for evaluation (nothing randomly applied)
+    eval_transform = transforms.Compose([
+        transforms.ToTensor(),
+        normalize
     ])
 
-    dataset = datasets.CIFAR10('C:\\dev\\adl\\ds-cifar10', download=True, train=True, transform=transform)  # (Windows also accepts forward slash as path)
-    trainset, valset = torch.utils.data.random_split(dataset, [int(len(dataset)*0.9), len(dataset)-int(len(dataset)*0.9)])
+    ds_root_path = "C:/dev/adl/ds-cifar10"
+    train_full = datasets.CIFAR10(ds_root_path, download=True, train=True, transform=train_transform)
+    val_full = datasets.CIFAR10(ds_root_path, download=True, train=True, transform=eval_transform)
+    # compute indices of shared permutation between train/val datasets with different transforms
+    n = len(train_full)
+    n_train = int(n * 0.9)  # keeping the same 0.9/0.1 ratio
+    generator = torch.Generator().manual_seed(args.seed)
+    perm = torch.randperm(n, generator=generator).tolist()
+    train_idx, val_idx = perm[ : n_train], perm[n_train : ]
+
+    trainset = Subset(train_full, train_idx)
+    valset = Subset(val_full, val_idx)
     trainloader = DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=4, pin_memory=True)
     valloader = DataLoader(valset, batch_size=64, shuffle=False)
 
-    # Download and load the test data
-    testset = datasets.CIFAR10('C:\\dev\\adl\\ds-cifar10', download=True, train=False, transform=transform)
+    # # Download and load the test data
+    testset = datasets.CIFAR10(ds_root_path, download=True, train=False, transform=eval_transform)
     testloader = DataLoader(testset, batch_size=64, shuffle=True)
 
     # Build a feed-forward network
@@ -122,15 +140,15 @@ def run(args):
             best_model_ckpt = {
                 "model": args.model,
                 "epoch": epoch,
-                "model_state_dict": model.state_dict(),
-                "optimizer_state_dict": optimizer.state_dict(),
+                "model_state_dict": copy.deepcopy(model.state_dict()),
+                "optimizer_state_dict": copy.deepcopy(optimizer.state_dict()),
                 "accuracy": accuracy,
             }
 
     test(model, device, testloader, criterion)
 
     if args.save_model:
-        save_model_ckpt(best_model_ckpt)
+        save_model_ckpt(best_model_ckpt, args.save_name)
 
 if __name__ == '__main__':
     args = parse_args()
