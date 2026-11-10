@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader, Subset
 from torch import optim
 
 from my_models import ViT, CrossViT   # rename the skeleton file for your implementation / comment before testing for ResNet
-from model_utils import save_model_ckpt
+from model_utils import save_model_ckpt, plot_accuracy
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train a neural network to classify CIFAR10')
@@ -128,11 +128,13 @@ def run(args):
     optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
 
     accuracy_max = -1.0
+    accuracy_vals = []
     best_model_ckpt: dict = {}
 
     for epoch in range(1, args.epochs + 1):
         train(model, trainloader, optimizer, criterion, device, epoch)
         accuracy = test(model, device, valloader, criterion, set="Validation")
+        accuracy_vals.append(accuracy)
         if accuracy > accuracy_max:
             accuracy_max = accuracy
             # Save whole checkpoint to possibly resume training
@@ -146,6 +148,8 @@ def run(args):
             }
 
     test(model, device, testloader, criterion)
+
+    plot_accuracy(accuracy_vals, accuracy_max, args.model, args.epochs)
 
     if args.save_model:
         save_model_ckpt(best_model_ckpt, args.save_name)

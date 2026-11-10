@@ -1,3 +1,6 @@
+import matplotlib.pyplot as plt
+import numpy as np
+
 from torch import save
 from pathlib import Path
 
@@ -19,3 +22,21 @@ def load_model_ckpt(file: Path) -> dict :
     pass
 
 # TODO: evaluation utils (inference and/or visualization)
+
+def plot_accuracy(accuracy_vals: list[float], accuracy_max: float, model_type: str, epochs: int):
+    out_dir = Path(f"plots/{model_type}/")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_fname = out_dir / f"{model_type}_accuracy_ep={epochs}_max={accuracy_max:.2f}.png"
+
+    # value processing
+    x = range(1, len(accuracy_vals) + 1)
+    plt.plot(x, accuracy_vals)
+    plt.ylim(0.0, 1.0)
+
+    # labels, etc.
+    plt.title(f"{model_type} accuracy for {epochs} epochs")
+    plt.xlabel("Epochs")
+    plt.ylabel("Accuracy")
+    plt.savefig(out_fname)
+    # plt.show()
+    print(f"Saved accuracy plot to {out_fname}")
