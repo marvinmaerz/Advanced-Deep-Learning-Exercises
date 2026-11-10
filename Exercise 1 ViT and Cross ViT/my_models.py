@@ -337,12 +337,12 @@ class ViT(nn.Module):
         b, n, _ = x.shape
 
         # concat class token
-        cls_tokens = repeat(self.cls_token, '1 1 d -> b 1 d', b = b)
-        x = torch.cat((cls_tokens, x), dim=1)
+        # cls_tokens = repeat(self.cls_token, '1 1 d -> b 1 d', b = b)
+        # x = torch.cat((cls_tokens, x), dim=1)
         # add positional embedding
-        x += self.pos_embedding[:, :(n + 1)]
+        # x += self.pos_embedding[:, :(n + 1)]
         # apply dropout
-        x = self.dropout(x)
+        # x = self.dropout(x)
 
         # forward through the transformer blocks
         x = self.transformer(x)
