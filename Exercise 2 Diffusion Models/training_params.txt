@@ -1,0 +1,19 @@
+2.2 - Diffusion Process: Forward and Backward
+python ex02_main.py --schedule linear --batch_size 128 --lr 0.0002 --timesteps 100 --epochs 30 --save_model --run_name t22_linear_t100_lr2e-4
+python ex02_main.py --schedule linear --batch_size 128 --lr 0.0005 --timesteps 200 --epochs 30 --save_model --run_name t22_linear_t200_lr5e-4
+
+
+2.3 - Alternative beta-Schedulers
+python ex02_main.py --schedule cosine --batch_size 128 --lr 0.0002 --timesteps 100 --epochs 30 --save_model --run_name t23_cosine_t100_lr2e-4
+python ex02_main.py --schedule cosine --batch_size 128 --lr 0.0002 --timesteps 200 --epochs 30 --save_model --run_name t23_cosine_t200_lr2e-4
+python ex02_main.py --schedule sigmoid --batch_size 128 --lr 0.0002 --timesteps 100 --epochs 30 --save_model --run_name t23_sigmoid_t100_lr2e-4  # still missing
+
+plots: python ex02_plot_betas.py -> saved under plot/...
+Schedulers:
+- Beta Schedules (beta_t): Determines how much new Gaussian noise is added in a single forward step (x_{t-1} -> x_t). 
+Linear and sigmoid stay bounded within [beta_start, beta_end] <-> cosine rises sharply near the end because signal alpha_bar approaches zero at t -> T.
+- Alpha Schedules (alpha_t): Represents how much of existing signal is kept per step (higher alpha = less new noise added). 
+Keeping higher alpha early and midway (as in cosine) preserves image structure longer, supporting smoother denoising and better sample quality.
+
+
+2.4 - Classifier-Free Guidance for DDPMs
