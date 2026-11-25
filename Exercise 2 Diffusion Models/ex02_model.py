@@ -12,7 +12,12 @@ from ex02_helpers import *
 # which is based on
 # Phil Wang (lucidrains): https://github.com/lucidrains/denoising-diffusion-pytorch (last access: 23.05.2023)
 
+
 class SinusoidalPositionEmbeddings(nn.Module):
+    # Encodes scalar diffusion timestep t into a multi-frequency sin/cos vector
+    # instead of passing raw t, High frequencies resolve fine step differences; 
+    # low frequencies capture broad noise regimes
+    # -> low noise are fine grained differences in small timesteps. sinusoids chnage rapid, help to distinguish between them. vice versa for large t
     def __init__(self, dim):
         super().__init__()
         self.dim = dim
@@ -20,6 +25,7 @@ class SinusoidalPositionEmbeddings(nn.Module):
     def forward(self, time):
         device = time.device
         half_dim = self.dim // 2
+        # Log-spaced frequencies from fast (small period) to slow (large period)
         embeddings = math.log(10000) / (half_dim - 1)
         embeddings = torch.exp(torch.arange(half_dim, device=device) * -embeddings)
         embeddings = time[:, None] * embeddings[None, :]
@@ -204,7 +210,7 @@ class Unet(nn.Module):
         block_klass = partial(ResnetBlock, groups=resnet_block_groups)
 
         # time embeddings
-        time_dim = dim * 4
+        time_dim = dim * 4    # 128 when image_size=32
 
         self.time_mlp = nn.Sequential(
             SinusoidalPositionEmbeddings(dim),
