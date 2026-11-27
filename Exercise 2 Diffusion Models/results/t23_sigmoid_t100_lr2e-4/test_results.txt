@@ -1,0 +1,13 @@
+run_name: t23_sigmoid_t100_lr2e-4
+schedule: sigmoid
+timesteps: 100
+batch_size: 128
+lr: 0.0002
+checkpoint: models\t23_sigmoid_t100_lr2e-4\best.pt
+test_mean_l2_loss: 0.185210
+per_timestep_l2_loss:
+  t=0: 0.579560
+  t=25: 0.201618
+  t=50: 0.081283
+  t=75: 0.038973
+  t=99: 0.024615

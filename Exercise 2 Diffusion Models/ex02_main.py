@@ -29,9 +29,56 @@ def parse_args():
     parser.add_argument('--save_model', action='store_true', default=False, help='For Saving the current Model')
     parser.add_argument('--run_name', type=str, default="DDPM")
     parser.add_argument('--dry_run', action='store_true', default=False, help='quickly check a single pass')
-    parser.add_argument('--schedule', type=str, default='linear', choices=['linear', 'cosine', 'sigmoid']) # add scheduler type argument
+    parser.add_argument('--schedule', type=str, default='linear', choices=['linear', 'cosine', 'sigmoid'])                                  # add scheduler type argument
+    parser.add_argument('--eval_only', action='store_true', default=False, help='skip training and evaluate saved checkpoint on test set')  # add eval_only argument
+    parser.add_argument('--ckpt_path', type=str, default=None, help='optional explicit path to .pt checkpoint for evaluation')              # add path to checkpoint
     return parser.parse_args()
 
+
+@torch.no_grad()
+def evaluate_and_save_test_results(model, testloader, diffusor, device, args, ckpt_used, store_path):
+    model.eval()
+    os.makedirs(store_path, exist_ok=True)
+    timesteps = args.timesteps
+
+    eval_timesteps = [0, timesteps // 4, timesteps // 2, (3 * timesteps) // 4, timesteps - 1]
+    timestep_losses = {t_val: 0.0 for t_val in eval_timesteps}
+    num_batches = 0
+
+    for images, _ in testloader:
+        images = images.to(device, non_blocking=(device == "cuda"))
+        for t_val in eval_timesteps:
+            t = torch.full((len(images),), t_val, device=device, dtype=torch.long)
+            loss = diffusor.p_losses(model, images, t, loss_type="l2")
+            timestep_losses[t_val] += loss.item()
+        num_batches += 1
+        if args.dry_run:
+            break
+
+    avg_losses = {t_val: total / max(num_batches, 1) for t_val, total in timestep_losses.items()}
+    mean_loss = sum(avg_losses.values()) / len(avg_losses)
+
+    lines = [
+        f"run_name: {args.run_name}",
+        f"schedule: {args.schedule}",
+        f"timesteps: {args.timesteps}",
+        f"batch_size: {args.batch_size}",
+        f"lr: {args.lr}",
+        f"checkpoint: {ckpt_used}",
+        f"test_mean_l2_loss: {mean_loss:.6f}",
+        "per_timestep_l2_loss:",
+    ]
+    for t_val, l in avg_losses.items():
+        lines.append(f"  t={t_val}: {l:.6f}")
+
+    report_text = "\n".join(lines) + "\n"
+    out_file = os.path.join(store_path, "test_results.txt")
+    with open(out_file, "w", encoding="utf-8") as f:
+        f.write(report_text)
+
+    print(report_text)
+    print(f"Saved test evaluation to: {out_file}")
+    return mean_loss
 
 @torch.no_grad()
 def sample_and_save_images(n_images, diffusor, model, device, store_path, reverse_transform):
@@ -173,19 +220,44 @@ def run(args):
     testset = datasets.CIFAR10('/proj/aimi-adl/CIFAR10/', download=True, train=False, transform=transform)
     testloader = DataLoader(testset, batch_size=int(batch_size/2), shuffle=True, pin_memory=pin_memory)
 
-    for epoch in range(epochs):
-        train(model, trainloader, optimizer, diffusor, epoch, device, args)
-        test(model, valloader, diffusor, device, args)
-
-    test(model, testloader, diffusor, device, args)
 
     save_path = os.path.join("results", args.run_name)  # TODO: Adapt to your needs
+    ckpt_dir = os.path.join("models", args.run_name)
+    best_ckpt_path = os.path.join(ckpt_dir, "best.pt")
+    final_ckpt_path = os.path.join(ckpt_dir, "ckpt.pt")
+
+    # If eval_only is set, skip training and evaluate the model on test set using saved checkpoint
+    if not args.eval_only:
+        best_val_loss = float("inf")
+        for epoch in range(epochs):
+            train(model, trainloader, optimizer, diffusor, epoch, device, args)
+            val_loss = test(model, valloader, diffusor, device, args)
+            if args.save_model and val_loss < best_val_loss:
+                best_val_loss = val_loss
+                os.makedirs(ckpt_dir, exist_ok=True)
+                torch.save(model.state_dict(), best_ckpt_path)
+
+        if args.save_model:
+            os.makedirs(ckpt_dir, exist_ok=True)
+            torch.save(model.state_dict(), final_ckpt_path)
+
+    # load checkpoint for test eval
+    if args.ckpt_path is not None:
+        ckpt_to_load = args.ckpt_path
+    elif os.path.exists(best_ckpt_path):
+        ckpt_to_load = best_ckpt_path
+    else:
+        ckpt_to_load = final_ckpt_path
+
+    ckpt_label = "none (untrained/in-memory)"
+    if os.path.exists(ckpt_to_load):
+        state_dict = torch.load(ckpt_to_load, map_location=device)
+        model.load_state_dict(state_dict)
+        ckpt_label = ckpt_to_load
+
     n_images = 8
     sample_and_save_images(n_images, diffusor, model, device, save_path, reverse_transform)
-    if args.save_model:
-        ckpt_dir = os.path.join("models", args.run_name)
-        os.makedirs(ckpt_dir, exist_ok=True)
-        torch.save(model.state_dict(), os.path.join(ckpt_dir, "ckpt.pt"))
+    evaluate_and_save_test_results(model, testloader, diffusor, device, args, ckpt_label, save_path)
 
 
 if __name__ == '__main__':

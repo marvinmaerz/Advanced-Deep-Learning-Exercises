@@ -1,0 +1,13 @@
+run_name: t22_linear_t200_lr5e-4
+schedule: linear
+timesteps: 200
+batch_size: 128
+lr: 0.0005
+checkpoint: models\t22_linear_t200_lr5e-4\best.pt
+test_mean_l2_loss: 0.154139
+per_timestep_l2_loss:
+  t=0: 0.621342
+  t=50: 0.077547
+  t=100: 0.038791
+  t=150: 0.021445
+  t=199: 0.011568

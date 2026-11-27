@@ -28,7 +28,7 @@ def cosine_beta_schedule(timesteps, s=0.008):
     alphas_cumprod = alphas_cumprod / alphas_cumprod[0]  # normalize so alpha_bar_0 = 1
     betas = 1 - (alphas_cumprod[1:] / alphas_cumprod[:-1])
 
-    return torch.clip(betas, 0.0001, 0.9999)    # paper after euquation (17) - clip to prevent singularities near t = T where alpha_bar_t -> 0 
+    return torch.clip(betas, 0.0001, 0.999)    # paper after euquation (17) - clip to prevent singularities near t = T where alpha_bar_t -> 0 
 
 
 
@@ -57,7 +57,6 @@ class Diffusion:
         Takes the number of noising steps, a function for generating a noise schedule as well as the image size as input.
         """
         self.timesteps = timesteps
-
         self.img_size = img_size
         self.device = device
 
@@ -86,35 +85,49 @@ class Diffusion:
         self.posterior_mean_coef_noise = self.betas / self.sqrt_alphas_cumprod_minus_one    # beta_t / sqrt(1-alpha_t)
         self.sqrt_betas = torch.sqrt(self.betas)                                            # sqrt(beat_t)
 
+        # Added for cosine stability (clamped x_0 prediction -> posterior mean)
+        self.posterior_mean_coef1 = (
+            self.betas * torch.sqrt(self.alphas_cumprod_prev) / (1.0 - self.alphas_cumprod)
+        )
+        self.posterior_mean_coef2 = (
+            (1.0 - self.alphas_cumprod_prev) * torch.sqrt(self.alphas) / (1.0 - self.alphas_cumprod)
+        )
+        self.posterior_variance = (
+            self.betas * (1.0 - self.alphas_cumprod_prev) / (1.0 - self.alphas_cumprod)
+        )
+
     @torch.no_grad()
     def p_sample(self, model, x, t, t_index):
         # TODO (2.2): implement the reverse diffusion process of the model for (noisy) samples x and timesteps t. Note that x and t both have a batch dimension
 
         # extract() indexes each 1D schedule tensor by timestep t (shape: (batch_size,))
-        betas_t = extract(self.betas, t, x.shape)
-        # reshapes the values to (batch_size, 1, 1, 1) so they broadcast across C, H, W of x
+        # and reshapes the values to (batch_size, 1, 1, 1) so they broadcast across C, H, W of x
+        sqrt_alphas_cumprod_t = extract(self.sqrt_alphas_cumprod, t, x.shape)
         sqrt_alphas_cumprod_minus_one_t = extract(
             self.sqrt_alphas_cumprod_minus_one, t, x.shape
         )
-        sqrt_recip_alphas_t = extract(self.sqrt_recip_alphas, t, x.shape)
+        coef1 = extract(self.posterior_mean_coef1, t, x.shape)
+        coef2 = extract(self.posterior_mean_coef2, t, x.shape)
 
-        # Equation 11 in the paper, estimate the mean of p_theta(x_{t-1} | x_t)
         # model(x, t) predicts the noise epsilon_theta(x_t, t) present in the noisy image x;
-        # Use our model (noise predictor) to predict the mean
-        model_mean = sqrt_recip_alphas_t * (
-            x - betas_t * model(x, t) / sqrt_alphas_cumprod_minus_one_t  # model(x, t) is the predicted noise
-        )
+        # reconstruct x_0 (Ho et al. Eq. 15) and clamp to [-1, 1] to prevent blow-up when beta_t -> 0.999
+        predicted_noise = model(x, t)
+        x_start = (x - sqrt_alphas_cumprod_minus_one_t * predicted_noise) / sqrt_alphas_cumprod_t
+        x_start = x_start.clamp(-1.0, 1.0)
+
+        # Equation 7 / 11 in the paper: estimate the posterior mean of p_theta(x_{t-1} | x_t, x_0)
+        model_mean = coef1 * x_start + coef2 * x
 
         # at t_index = 0 / final step, no additional noise is added
         if t_index == 0:
             return model_mean
 
-        # For t > 0, add scaled Gaussian noise z ~ N(0, I) with std sqrt(beta_t)
-        posterior_variance_t = extract(self.sqrt_betas, t, x.shape)
+        # For t > 0, add scaled Gaussian noise z ~ N(0, I) with std sqrt(posterior_variance_t)
+        posterior_std_t = torch.sqrt(extract(self.posterior_variance, t, x.shape))
         noise = torch.randn_like(x)    # randn_like matches shape of x
-        
+
         # TODO (2.2): The method should return the image at timestep t-1.
-        return model_mean + posterior_variance_t * noise     # in exercise equation (8) sqrt(beta_z) * z
+        return model_mean + posterior_std_t * noise
 
     # Algorithm 2 (including returning all images)
     @torch.no_grad()

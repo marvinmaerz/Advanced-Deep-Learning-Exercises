@@ -1,0 +1,13 @@
+run_name: t23_cosine_t200_lr2e-4
+schedule: cosine
+timesteps: 200
+batch_size: 128
+lr: 0.0002
+checkpoint: models\t23_cosine_t200_lr2e-4\best.pt
+test_mean_l2_loss: 0.132273
+per_timestep_l2_loss:
+  t=0: 0.547477
+  t=50: 0.070481
+  t=100: 0.031374
+  t=150: 0.011748
+  t=199: 0.000287

@@ -1,12 +1,21 @@
 2.2 - Diffusion Process: Forward and Backward
 python ex02_main.py --schedule linear --batch_size 128 --lr 0.0002 --timesteps 100 --epochs 30 --save_model --run_name t22_linear_t100_lr2e-4
 python ex02_main.py --schedule linear --batch_size 128 --lr 0.0005 --timesteps 200 --epochs 30 --save_model --run_name t22_linear_t200_lr5e-4
-
+-> test:
+python ex02_main.py --eval_only --schedule linear --batch_size 128 --lr 0.0002 --timesteps 100 --run_name t22_linear_t100_lr2e-4
+python ex02_main.py --eval_only --schedule linear --batch_size 128 --lr 0.0005 --timesteps 200 --run_name t22_linear_t200_lr5e-4
 
 2.3 - Alternative beta-Schedulers
 python ex02_main.py --schedule cosine --batch_size 128 --lr 0.0002 --timesteps 100 --epochs 30 --save_model --run_name t23_cosine_t100_lr2e-4
 python ex02_main.py --schedule cosine --batch_size 128 --lr 0.0002 --timesteps 200 --epochs 30 --save_model --run_name t23_cosine_t200_lr2e-4
-python ex02_main.py --schedule sigmoid --batch_size 128 --lr 0.0002 --timesteps 100 --epochs 30 --save_model --run_name t23_sigmoid_t100_lr2e-4  # still missing
+python ex02_main.py --schedule sigmoid --batch_size 128 --lr 0.0002 --timesteps 100 --epochs 30 --save_model --run_name t23_sigmoid_t100_lr2e-4
+-> test:
+python ex02_main.py --eval_only --schedule cosine --batch_size 128 --lr 0.0002 --timesteps 100 --run_name t23_cosine_t100_lr2e-4
+python ex02_main.py --eval_only --schedule cosine --batch_size 128 --lr 0.0002 --timesteps 200 --run_name t23_cosine_t200_lr2e-4
+python ex02_main.py --eval_only --schedule sigmoid --batch_size 128 --lr 0.0002 --timesteps 100 --run_name t23_sigmoid_t100_lr2e-4 # TODO
+
+TODO run the models on test and save the results
+TODO look at cosine results, this looks really weird, might also explain the scheduler plots -> check the function!
 
 plots: python ex02_plot_betas.py -> saved under plot/...
 Schedulers:
